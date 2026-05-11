@@ -429,6 +429,11 @@
             letter-spacing: 3px;
         }
         
+        .start-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 3px 0 #6b3f0c;
+        }
+        
         .control-hint {
             background: #2a2416aa;
             border-radius: 40px;
@@ -599,6 +604,7 @@
         const shopMessage = document.getElementById('shopMessage');
         const colorOptionsDiv = document.getElementById('colorOptions');
         const pauseIndicator = document.getElementById('pauseIndicator');
+        const introScreen = document.getElementById('introScreen');
         
         function togglePause() {
             if (!gameActive || !gameRunning) return;
@@ -847,4 +853,294 @@
                 ctx.lineTo(x, canvas.height);
                 ctx.stroke();
             }
-            ctx.setLineDash([].
+            ctx.setLineDash([]);
+            
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = "#ffe6b3";
+            ctx.setLineDash([15, 25]);
+            for(let i = 0; i < LANE_COUNT; i++) {
+                let centerX = i * LANE_WIDTH + LANE_WIDTH/2;
+                ctx.beginPath();
+                ctx.moveTo(centerX, 0);
+                ctx.lineTo(centerX, canvas.height);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            
+            ctx.strokeStyle = "#c9a53b";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(15, 4, canvas.width-30, canvas.height-8);
+        }
+        
+        function drawPlayer() {
+            const mainColor = getCurrentCarColor();
+            const secColor = getCarSecondaryColor();
+            if(lives === 1 && gameActive) {
+                ctx.fillStyle = "#cc8844";
+                ctx.fillRect(currentX, PLAYER_Y, CAR_WIDTH, CAR_HEIGHT);
+            } else {
+                ctx.fillStyle = mainColor;
+                ctx.fillRect(currentX, PLAYER_Y, CAR_WIDTH, CAR_HEIGHT);
+                ctx.fillStyle = secColor;
+                ctx.fillRect(currentX+8, PLAYER_Y+8, CAR_WIDTH-16, 18);
+            }
+            ctx.fillStyle = "#ffcc44";
+            ctx.fillRect(currentX+12, PLAYER_Y+CAR_HEIGHT-22, CAR_WIDTH-24, 12);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(currentX+6, PLAYER_Y+32, 12, 18);
+            ctx.fillRect(currentX+CAR_WIDTH-18, PLAYER_Y+32, 12, 18);
+            ctx.fillStyle = "#ffdd88";
+            ctx.fillRect(currentX+2, PLAYER_Y+CAR_HEIGHT-12, 8, 8);
+            ctx.fillRect(currentX+CAR_WIDTH-10, PLAYER_Y+CAR_HEIGHT-12, 8, 8);
+            ctx.fillStyle = "#101010";
+            ctx.fillRect(currentX+4, PLAYER_Y+12, 8, 12);
+            ctx.fillRect(currentX+CAR_WIDTH-12, PLAYER_Y+12, 8, 12);
+            ctx.fillStyle = "#f4c542";
+            ctx.fillRect(currentX+22, PLAYER_Y+65, 8, 8);
+        }
+        
+        function getXFromLaneInterpolated(obs) {
+            let startX = getXFromLane(obs.startLane, CAR_WIDTH);
+            let endX = getXFromLane(obs.targetLane, CAR_WIDTH);
+            return startX + (endX - startX) * obs.animProgress;
+        }
+        
+        function drawObstacle(obs) { 
+            let drawX = obs.isAnimating ? getXFromLaneInterpolated(obs) : getXFromLane(obs.lane, CAR_WIDTH);
+            let y = obs.y; 
+            ctx.fillStyle = "#9a2a2a"; 
+            ctx.fillRect(drawX, y, CAR_WIDTH, CAR_HEIGHT); 
+            ctx.fillStyle = "#551111"; 
+            ctx.fillRect(drawX+6, y+10, CAR_WIDTH-12, 20); 
+            ctx.fillStyle = "#2b1a1a"; 
+            ctx.fillRect(drawX+12, y+48, CAR_WIDTH-24, 16); 
+            ctx.fillStyle = "#ffaa66"; 
+            ctx.fillRect(drawX+4, y+CAR_HEIGHT-12, 8, 8); 
+            ctx.fillRect(drawX+CAR_WIDTH-12, y+CAR_HEIGHT-12, 8, 8); 
+            ctx.fillStyle = "#dd8844"; 
+            ctx.fillRect(drawX+20, y+28, 12, 12);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(drawX+12, y+25, 10, 8);
+            ctx.fillRect(drawX+CAR_WIDTH-22, y+25, 10, 8);
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(drawX+14, y+27, 5, 5);
+            ctx.fillRect(drawX+CAR_WIDTH-20, y+27, 5, 5);
+        }
+        
+        function drawCoin(coin) { let x = getXFromLane(coin.lane, 28); let y = coin.y; ctx.beginPath(); ctx.arc(x+14, y+14, 12, 0, Math.PI*2); ctx.fillStyle = "#f5c542"; ctx.fill(); ctx.beginPath(); ctx.arc(x+14, y+14, 8, 0, Math.PI*2); ctx.fillStyle = "#e5b82b"; ctx.fill(); ctx.fillStyle = "#ffec80"; ctx.font = "bold 18px monospace"; ctx.fillText("💰", x+6, y+22); }
+        function drawFuelItem(fuelIt) { let x = getXFromLane(fuelIt.lane, 36); let y = fuelIt.y; ctx.fillStyle = "#22aa55"; ctx.fillRect(x, y, 36, 38); ctx.fillStyle = "#168f44"; ctx.fillRect(x+6, y+6, 24, 26); ctx.fillStyle = "#ffffbb"; ctx.font = "bold 22px sans-serif"; ctx.fillText("⛽", x+6, y+29); ctx.fillStyle = "#ff7777"; ctx.fillRect(x+10, y+2, 16, 8); ctx.fillStyle = "#ffee88"; ctx.font = "bold 10px monospace"; ctx.fillText("+32", x+10, y+50); }
+        function updateFuelBarUI() { const fillDiv = document.getElementById('fuelFill'); let percent = Math.max(0, Math.min(100, fuel)) / 100 * 100; fillDiv.style.width = percent + "%"; if(fuel <= 20) fillDiv.classList.add('low'); else fillDiv.classList.remove('low'); }
+        function rectCollide(r1, r2) { return !(r2.x > r1.x+r1.w || r2.x+r2.w < r1.x || r2.y > r1.y+r1.h || r2.y+r2.h < r1.y); }
+        
+        function showGameOverButton(show) { gameoverRestartBtn.style.display = show ? 'block' : 'none'; }
+        
+        function updateEnemyMovement() {
+            for(let i = 0; i < obstacles.length; i++) {
+                const obs = obstacles[i];
+                if(obs.isAnimating) {
+                    obs.animProgress += animSpeed * 0.7;
+                    if(obs.animProgress >= 1) {
+                        obs.animProgress = 1;
+                        obs.isAnimating = false;
+                        obs.lane = obs.targetLane;
+                        delete obs.startLane;
+                    }
+                    continue;
+                }
+                if(obs.hasSwitched) continue;
+                const isLeftNeighbor = (obs.lane === targetLane - 1);
+                const isRightNeighbor = (obs.lane === targetLane + 1);
+                const isNeighbor = isLeftNeighbor || isRightNeighbor;
+                if(!isNeighbor) continue;
+                const distanceToPlayer = Math.abs(obs.y - PLAYER_Y);
+                const isFarEnough = (obs.y < PLAYER_Y - 100) && (obs.y > PLAYER_Y - 280);
+                if(isFarEnough && Math.random() < 0.20) {
+                    obs.startLane = obs.lane;
+                    obs.targetLane = targetLane;
+                    obs.animProgress = 0;
+                    obs.isAnimating = true;
+                    obs.hasSwitched = true;
+                }
+            }
+        }
+        
+        function updateGame() {
+            if(!gameActive || !gameRunning || isPaused) return;
+            updateAnimation();
+            if(damageCooldown > 0) damageCooldown--;
+            fuel -= 0.115;
+            if(fuel <= 0) { gameRunning = false; fuel = 0; updateFuelBarUI(); showGameOverButton(true); return; }
+            updateFuelBarUI();
+            if(score > 200) currentSpeed = Math.min(6.6, baseSpeed + Math.floor(score/160));
+            else if(score > 70) currentSpeed = Math.min(5.5, baseSpeed + 1.2);
+            else currentSpeed = baseSpeed;
+            
+            sceneryOffset = (sceneryOffset + currentSpeed * 0.5) % 300;
+            updateEnemyMovement();
+            
+            for(let i=0; i<obstacles.length; i++) { obstacles[i].y += currentSpeed; if(obstacles[i].y > canvas.height + 200) obstacles.splice(i,1), i--; }
+            for(let i=0; i<coinsItems.length; i++) { coinsItems[i].y += currentSpeed; if(coinsItems[i].y > canvas.height + 100) coinsItems.splice(i,1), i--; }
+            for(let i=0; i<fuelItems.length; i++) { fuelItems[i].y += currentSpeed; if(fuelItems[i].y > canvas.height + 100) fuelItems.splice(i,1), i--; }
+            
+            const playerRect = { x: currentX, y: PLAYER_Y, w: CAR_WIDTH, h: CAR_HEIGHT };
+            for(let i=0; i<obstacles.length; i++) {
+                let obsX;
+                if(obstacles[i].isAnimating) {
+                    let startX = getXFromLane(obstacles[i].startLane, CAR_WIDTH);
+                    let endX = getXFromLane(obstacles[i].targetLane, CAR_WIDTH);
+                    obsX = startX + (endX - startX) * obstacles[i].animProgress;
+                } else {
+                    obsX = getXFromLane(obstacles[i].lane, CAR_WIDTH);
+                }
+                let obsRect = { x: obsX, y: obstacles[i].y, w: CAR_WIDTH, h: CAR_HEIGHT };
+                if(rectCollide(playerRect, obsRect)) {
+                    if(damageCooldown <= 0) {
+                        lives--; updateLivesUI();
+                        if(lives <= 0) { gameRunning = false; showGameOverButton(true); return; }
+                        addSmokeEffect(); damageCooldown = 35; obstacles.splice(i,1); i--;
+                    } else { obstacles.splice(i,1); i--; }
+                }
+            }
+            
+            for(let i=0; i<coinsItems.length; i++) {
+                let coinX = getXFromLane(coinsItems[i].lane, 28);
+                let coinRect = { x: coinX, y: coinsItems[i].y, w: 28, h: 28 };
+                if(rectCollide(playerRect, coinRect)) {
+                    score += 15;
+                    addCoins(15);
+                    coinsItems.splice(i,1); i--;
+                }
+            }
+            
+            for(let i=0; i<fuelItems.length; i++) {
+                let fuelX = getXFromLane(fuelItems[i].lane, 36);
+                let fuelRect = { x: fuelX, y: fuelItems[i].y, w: 36, h: 38 };
+                if(rectCollide(playerRect, fuelRect)) { fuel = Math.min(100, fuel + 32); updateFuelBarUI(); fuelItems.splice(i,1); i--; }
+            }
+            
+            frameCounter++;
+            let dynamicSpawn = Math.max(28, spawnGap - Math.floor(score / 280));
+            if(frameCounter >= dynamicSpawn) {
+                frameCounter = 0;
+                let rand = Math.random();
+                let isFuelLow = (fuel < fuelLowThreshold);
+                
+                if(isFuelLow && rand < 0.5) {  
+                    let laneChoice = Math.floor(Math.random() * LANE_COUNT);
+                    fuelItems.push({ lane: laneChoice, y: -45 - Math.random() * 40 });
+                    if(Math.random() < 0.4) { let extraLane = (laneChoice+2) % LANE_COUNT; coinsItems.push({ lane: extraLane, y: -35 }); }
+                } 
+                else {
+                    if(rand < 0.55) {
+                        let laneChoice = Math.floor(Math.random() * LANE_COUNT);
+                        obstacles.push({ 
+                            lane: laneChoice, 
+                            y: -CAR_HEIGHT - Math.random() * 50,
+                            hasSwitched: false,
+                            isAnimating: false
+                        });
+                    } 
+                    else {
+                        let laneChoice = Math.floor(Math.random() * LANE_COUNT);
+                        coinsItems.push({ lane: laneChoice, y: -35 - Math.random() * 30 });
+                        if(Math.random() < 0.25) { let secondLane = (laneChoice+3)%LANE_COUNT; coinsItems.push({ lane: secondLane, y: -45 }); }
+                    }
+                }
+                
+                if(isFuelLow && Math.random() < 0.3) { let emergencyLane = Math.floor(Math.random() * LANE_COUNT); fuelItems.push({ lane: emergencyLane, y: -30 }); }
+            }
+            
+            if(fuel < 28 && gameRunning) { let hasFuelOnScreen = fuelItems.length > 0; if(!hasFuelOnScreen && Math.random() < 0.03) { let lane = Math.floor(Math.random() * LANE_COUNT); fuelItems.push({ lane: lane, y: -50 }); } }
+            updateSmoke();
+        }
+        
+        function draw() {
+            drawScenery();
+            drawRoad();
+            for(let c of coinsItems) drawCoin(c);
+            for(let f of fuelItems) drawFuelItem(f);
+            for(let obs of obstacles) drawObstacle(obs);
+            drawSmoke();
+            drawPlayer();
+            if(damageCooldown > 0 && gameActive && gameRunning && !isPaused) { ctx.globalAlpha = 0.6; ctx.fillStyle = "#ffffaa"; ctx.fillRect(currentX-3, PLAYER_Y-3, CAR_WIDTH+6, CAR_HEIGHT+6); ctx.globalAlpha = 1; }
+            if(gameActive && fuel <= 30 && gameRunning && !isPaused) { ctx.font = "bold 18px 'Segoe UI'"; ctx.fillStyle = "#ff8844"; ctx.fillText("⚠️ PROCURE ⛽ COMBUSTÍVEL! ⚠️", canvas.width/2-145, 55); }
+            if(!gameActive) { ctx.globalAlpha = 0.7; ctx.fillStyle = "#021005cc"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.globalAlpha = 1; ctx.font = "bold 28px monospace"; ctx.fillStyle = "#ffdd99"; ctx.fillText("🏁 APERTE 'COMEÇAR' 🏁", canvas.width/2-170, canvas.height/2); }
+            else if(!gameRunning) { ctx.font = "800 44px system-ui"; ctx.fillStyle = "#f0d050"; ctx.shadowBlur = 8; ctx.fillText("GAME OVER", canvas.width/2-135, canvas.height/2-50); ctx.font = "bold 16px monospace"; ctx.fillStyle = "#ffe5aa"; ctx.fillText("Clique em REINICIAR", canvas.width/2-105, canvas.height/2+30); ctx.shadowBlur = 0; }
+            else if(isPaused) { ctx.globalAlpha = 0.7; ctx.fillStyle = "#000000aa"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.globalAlpha = 1; ctx.font = "bold 30px monospace"; ctx.fillStyle = "#ffdd99"; ctx.fillText("⏸️ PAUSADO", canvas.width/2-95, canvas.height/2); ctx.font = "14px monospace"; ctx.fillStyle = "#eedd88"; ctx.fillText("Pressione ESPAÇO para continuar", canvas.width/2-135, canvas.height/2+50); }
+            ctx.font = "bold 18px 'Courier New'"; ctx.fillStyle = "#feffcf"; ctx.fillText("💰 "+Math.floor(totalCoins), 18, 43); ctx.fillStyle = "#ffffbb"; ctx.fillText("⛽ "+Math.floor(fuel)+"%", canvas.width-95, 43);
+            if(animProgress < 1 && gameActive && !isPaused) { ctx.font = "italic 12px monospace"; ctx.fillStyle = "#aaffdd"; ctx.fillText("✧ DESLIZANDO ✧", canvas.width/2-55, PLAYER_Y-8); }
+        }
+        
+        function resetGameState() {
+            obstacles = []; coinsItems = []; fuelItems = []; smokeParticles = [];
+            score = 0; fuel = 100; lives = 2; damageCooldown = 0;
+            targetLane = 2; currentLane = 2; animProgress = 1;
+            currentX = getXFromLane(2, CAR_WIDTH); targetX = currentX;
+            currentSpeed = baseSpeed; frameCounter = 0; gameRunning = true;
+            updateFuelBarUI(); updateLivesUI(); showGameOverButton(false);
+        }
+        
+        function startMatch() { 
+            resetGameState(); 
+            gameActive = true; 
+            gameRunning = true; 
+            isPaused = false;
+            pauseIndicator.style.display = 'none';
+            introScreen.style.display = 'none'; 
+            showGameOverButton(false); 
+        }
+        
+        function restartMatch() { 
+            if(!gameActive) { 
+                startMatch(); 
+            } else { 
+                resetGameState(); 
+                gameRunning = true; 
+                isPaused = false;
+                pauseIndicator.style.display = 'none';
+            } 
+        }
+        
+        function gameLoop() { 
+            if(gameActive && gameRunning && !isPaused) updateGame(); 
+            draw(); 
+            requestAnimationFrame(gameLoop); 
+        }
+        
+        function handleKey(e) { 
+            if(e.code === 'Space') {
+                e.preventDefault();
+                if(gameActive && gameRunning) togglePause();
+                return;
+            }
+            if(!gameActive || isPaused) return; 
+            const key = e.key; 
+            if(key === 'ArrowLeft' || key === 'a' || key === 'A') { moveLeft(); e.preventDefault(); } 
+            else if(key === 'ArrowRight' || key === 'd' || key === 'D') { moveRight(); e.preventDefault(); } 
+        }
+        
+        function setupControls() {
+            const leftBtn = document.querySelector('[data-dir="left"]');
+            const rightBtn = document.querySelector('[data-dir="right"]');
+            if(leftBtn) { leftBtn.addEventListener('click', (e) => { e.preventDefault(); moveLeft(); }); leftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); moveLeft(); }); }
+            if(rightBtn) { rightBtn.addEventListener('click', (e) => { e.preventDefault(); moveRight(); }); rightBtn.addEventListener('touchstart', (e) => { e.preventDefault(); moveRight(); }); }
+        }
+        
+        window.addEventListener('keydown', handleKey);
+        document.getElementById('restartButton').addEventListener('click', () => { restartMatch(); });
+        document.getElementById('shopButton').addEventListener('click', () => { openShop(); });
+        document.getElementById('closeShopBtn').addEventListener('click', () => { closeShop(); });
+        document.getElementById('backShopBtn').addEventListener('click', () => { closeShop(); });
+        gameoverRestartBtn.addEventListener('click', () => { restartMatch(); });
+        document.getElementById('startGameBtn').addEventListener('click', (e) => { e.preventDefault(); startMatch(); });
+        setupControls();
+        
+        loadProgress();
+        resetGameState();
+        gameActive = false;
+        updateLivesUI();
+        gameLoop();
+    })();
+</script>
+</body>
+</html>
